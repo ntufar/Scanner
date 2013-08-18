@@ -1,0 +1,11 @@
+service scanner
+{
+        flags           = REUSE
+        socket_type     = stream
+        wait            = no
+        user            = ntufar
+        server          = /home/ntufar/projects/Scanner/Server
+	port		= 65001
+        log_on_failure  += USERID
+        disable         = no
+}
