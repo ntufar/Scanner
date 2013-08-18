@@ -170,8 +170,8 @@ std::vector<std::string> split(const std::string &s, char delim) {
 
 int main(int argc, char **argv) {
     string patternsFilePath = "/home/ntufar/patterns3";
-    //string loadPatternsResult = loadPaternsFile(patternsFilePath);
-    //cout << loadPatternsResult << endl;
+    string loadPatternsResult = loadPaternsFile(patternsFilePath);
+    cout << loadPatternsResult << endl;
     
     
     std::string userInput;
