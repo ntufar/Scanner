@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
       
       getline (cin, userInput);
       vector<string> tokens;
-      boost::split(tokens, userInput, boost::is_any_of("\t "));
+      boost::split(tokens, userInput, boost::is_any_of("\t \r\n"));
       
       if( tokens.size() < 1 )
 	continue;
