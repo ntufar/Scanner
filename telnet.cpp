@@ -41,6 +41,8 @@ public:
 	{
 		io_service_.post(boost::bind(&telnet_client::do_close, this));
 	}
+	
+	deque<char> readque;
 
 private:
 
@@ -78,8 +80,10 @@ private:
 	{ // the asynchronous read operation has now completed or failed and returned an error
 		if (!error)
 		{ // read completed, so process the data
-			cout.write(read_msg_, bytes_transferred); // echo to standard output
-			//cout << "\n";
+			//cerr << "\nR: ";
+			for(int i = 0; i < bytes_transferred; i++){
+				readque.push_back(read_msg_[i]);
+			}
 			read_start(); // start waiting for another asynchronous read again
 		}
 		else

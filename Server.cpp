@@ -169,7 +169,7 @@ std::vector<std::string> split(const std::string &s, char delim) {
 
 
 int main(int argc, char **argv) {
-    string patternsFilePath = "/home/ntufar/patterns3";
+    string patternsFilePath = "/home/ntufar/projects/Scanner/doc/patterns100";
     string loadPatternsResult = loadPaternsFile(patternsFilePath);
     cout << loadPatternsResult << endl;
     

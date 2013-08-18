@@ -1,6 +1,17 @@
 #include <gtkmm.h>
 #include <iostream>
+#include <deque>
+#include <iostream>
+#include <boost/bind.hpp>
+#include <boost/asio.hpp>
+#include <boost/thread.hpp>
+#include "telnet.h"
+#ifdef POSIX
+#include <termios.h>
+#endif
 
+using boost::asio::ip::tcp;
+using namespace std;
 
 class ScannerGUI : public Gtk::Window
 {
@@ -8,6 +19,7 @@ class ScannerGUI : public Gtk::Window
 public:
   ScannerGUI();
   virtual ~ScannerGUI();
+  void serverCommunicationThread();
 
 protected:
   //Signal handlers:
@@ -19,11 +31,83 @@ protected:
   Gtk::TextView m_TextView;  
   Gtk::ScrolledWindow m_ScrolledWindow;
   Glib::RefPtr<Gtk::TextBuffer> m_refTextBuffer1;
+  Glib::Thread * m_thread; 
   
   Gtk::Button m_button2;
   Gtk::ProgressBar m_progress;
 };
 
+void ScannerGUI::serverCommunicationThread() 
+{ 
+		// on Unix POXIS based systems, turn off line buffering of input, so cin.get() returns after every keypress
+		// On other systems, you'll need to look for an equivalent
+		#ifdef POSIX
+			termios stored_settings;
+			tcgetattr(0, &stored_settings);
+			termios new_settings = stored_settings;
+			new_settings.c_lflag &= (~ICANON);
+			new_settings.c_lflag &= (~ISIG); // don't automatically handle control-C
+			tcsetattr(0, TCSANOW, &new_settings);
+		#endif
+		try{
+			boost::asio::io_service io_service;
+			// resolve the host name and port number to an iterator that can be used to connect to the server
+			tcp::resolver resolver(io_service);
+			
+			tcp::resolver::query query("localhost", "65001");
+			tcp::resolver::iterator iterator = resolver.resolve(query);
+			// define an instance of the main class of this program
+			telnet_client c(io_service, iterator);
+			// run the IO service as a separate thread, so the main thread can block on standard input
+			boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));	
+			while (1)
+			{
+				string ch;
+				while(!c.readque.empty()){
+					ch += c.readque.front();
+					c.readque.pop_front();
+				}
+				cerr << ch;
+				m_refTextBuffer1->insert_at_cursor(ch);
+				Glib::usleep(1000);
+				/*
+				cerr << "DaTa AvAiLaBle"<<endl;
+//				c.telnetin.getline(&ch,1024);
+				cout << ch;
+				cerr << ch;
+				m_refTextBuffer1->insert_at_cursor(ch);
+				* */
+				/*
+				cin.get(ch); // blocking wait for standard input
+				if (ch == 3) // ctrl-C to end program
+					break;
+				c.write(ch);
+				*/
+			}
+			c.close(); // close the telnet client connection
+			t.join(); // wait for the IO service thread to close			
+		}catch(exception& e){
+				cerr << "Exception: " << e.what() << "\n";
+		}
+		#ifdef POSIX // restore default buffering of standard input
+			tcsetattr(0, TCSANOW, &stored_settings);
+		#endif		
+		/*
+  while(1) 
+  { 
+    Glib::usleep(50000);  // 50.000 Mikrosekunden warten 
+    
+    m_dispatcher();       // Threadsafer Aufruf der pulse()-Methode 
+  
+    // Dies ist ein anonymer scope [Erklärung siehe Destruktor Defintion] 
+    { 
+      Glib::Mutex::Lock lock(mutex); 
+      if(m_end_thread)      // Müssen wir beenden? 
+        return; 
+    }// Ende des anonymen scopes, das den effekt hat das das mutex wir unlocked wird 
+  }
+  * */ 
+}
 
 
 int main (int argc, char *argv[])
@@ -62,7 +146,7 @@ ScannerGUI::ScannerGUI():
   
   m_ScrolledWindow.add(m_TextView);
   m_refTextBuffer1 = Gtk::TextBuffer::create();
-  m_refTextBuffer1->set_text("This is the text from TextBuffer #1.");
+  //m_refTextBuffer1->set_text("This is the text from TextBuffer #1.");
   m_TextView.set_buffer(m_refTextBuffer1);
   m_TextView.show();
   m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
@@ -79,6 +163,8 @@ ScannerGUI::ScannerGUI():
   m_progress.set_fraction(0.33);
 
   m_progress.show();
+
+	m_thread = Glib::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread),false); 
 
   m_box1.show();
 }
