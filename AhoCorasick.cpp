@@ -95,11 +95,12 @@ int buildMatchingMachine(const vector<string> &words, char lowestChar = 0, char 
                 failure = g[failure][c];
                 f[g[state][c]] = failure;
                 //out[g[state][c]] |= out[failure]; // Merge out values
-		
-		for( int x = 0; x < out[failure].size(); x++ ){
-		  if(out[g[state][c]][x]==0)
-		    out[g[state][c]][x] = out[failure][x];
-		}
+		/*
+				for( int x = 0; x < out[failure].size(); x++ ){
+				  if(out[g[state][c]][x]==0)
+					out[g[state][c]][x] = out[failure][x];
+				}
+		*/
                 q.push(g[state][c]);
             }
         }
