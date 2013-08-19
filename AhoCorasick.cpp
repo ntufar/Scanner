@@ -94,13 +94,15 @@ int buildMatchingMachine(const vector<string> &words, char lowestChar = 0, char 
                 }
                 failure = g[failure][c];
                 f[g[state][c]] = failure;
+                cout<<"out[g[state][c]] size "<<out[g[state][c]].size()<<endl;
+                cout<<"out[failure] size "<<out[failure].size()<<endl;
                 //out[g[state][c]] |= out[failure]; // Merge out values
-		/*
-				for( int x = 0; x < out[failure].size(); x++ ){
+                /*
+ 				for( int x = 0; x < out[failure].size(); x++ ){
 				  if(out[g[state][c]][x]==0)
 					out[g[state][c]][x] = out[failure][x];
 				}
-		*/
+				*/
                 q.push(g[state][c]);
             }
         }
@@ -123,7 +125,8 @@ int buildMatchingMachine(const vector<string> &words, char lowestChar = 0, char 
 int findNextState(int currentState, char nextInput, char lowestChar = 0) {
     int answer = currentState;
     int c = nextInput - lowestChar;
-    while (g[answer].find(c) == g[answer].end()) answer = f[answer];
+    int counter =0;
+    while (g[answer].find(c) == g[answer].end())answer = f[answer];
     return g[answer][c];
 }
 
@@ -154,12 +157,12 @@ vector< string > AhoCorasick::query(string text)
 {
    vector<string> result;
     int currentState = 0;
-    for (int i = 0; i < text.size(); ++i) {
+    for (size_t i = 0; i < text.size(); ++i) {
        currentState = findNextState(currentState, text[i], 0);
        if (out.find(currentState) == out.end()) continue; // Nothing new, let's move on to the next character. 
        for (int j = 0; j < this->patterns.size(); ++j) {
            if (out[currentState][j] != 0) { // Matched keywords[j]
-	     result.push_back(this->patterns[j]);
+			result.push_back(this->patterns[j]);
            }
        }
    }
@@ -172,16 +175,18 @@ vector< string > AhoCorasick::query(string text)
 vector< string > AhoCorasick::query(unsigned char *text, size_t length)
 {
    vector<string> result;
-   unsigned char *x = (unsigned char*)text;
-   string y;
-   
+	
    int currentState = 0;
-    for (int i = 0; i < length; ++i) {
-       currentState = findNextState(currentState, text[i], 0);
-       if (out.find(currentState) == out.end()) continue; // Nothing new, let's move on to the next character. 
+    for (size_t i = 0; i < length - 1; ++i) {
+       currentState = findNextState(currentState, (unsigned char)text[i], 0);
+       //if( (i % 1000000) == 0)
+		//cout << currentState << "\rlength " << length << " i " << i << flush;
+       if (out.find(currentState) == out.end()) continue; // Nothing new, let's move on to the next character.
+       //cout << "\nxxxx"<<endl; 
        for (int j = 0; j < this->patterns.size(); ++j) {
            if (out[currentState][j] != 0) { // Matched keywords[j]
-	     result.push_back(this->patterns[j]);
+				//cout << "-----------------------------------------------------------------"<<endl; 
+				result.push_back(this->patterns[j]);
            }
        }
    }

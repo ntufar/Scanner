@@ -192,54 +192,55 @@ int main(int argc, char **argv) {
 	continue;
       
       if(tokens[0] == "quit"){
-	cout << "Godbye" <<endl;
-	exit(0);
+		cout << "Godbye" <<endl;
+		exit(0);
       }
       
       if(tokens[0] == "loadpatterns"){
-	if( tokens.size() < 2 ){
-	  cout << "Please provide file name"<<endl;
-	  continue;
-	}
-	string loadpatternsresult = loadPaternsFile(tokens[1]);
-	cout << loadpatternsresult << endl;
-	continue;
+		if( tokens.size() < 2 ){
+		  cout << "Please provide file name"<<endl;
+		  continue;
+		}
+		string loadpatternsresult = loadPaternsFile(tokens[1]);
+		cout << loadpatternsresult << endl;
+		continue;
       }
       
       if(tokens[0] == "scanfile"){
-	void *filecontents;
-	string scanFileName = tokens[1];
-	
-	vector<string> results;
-	{
-		boost::interprocess::file_mapping m_file(scanFileName.c_str(), boost::interprocess::read_only);
-		boost::interprocess::mapped_region region(m_file, boost::interprocess::read_only); 
+		void *filecontents;
+		string scanFileName = tokens[1];
 		
-		results = ahocorasick.query((unsigned char*)region.
-		get_address(), region.get_size());
-	}
-	
-	for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
-	  string s = *it;
-	  Pattern p = patterns[s];
-	  cout << p.GUID << endl;
-	}
-	continue;
+		vector<string> results;
+		{
+			boost::interprocess::file_mapping m_file(scanFileName.c_str(), boost::interprocess::read_only);
+			boost::interprocess::mapped_region region(m_file, boost::interprocess::read_only); 
+			
+			results = ahocorasick.query((unsigned char*)region.
+			get_address(), region.get_size());
+		}
+		
+		for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
+		  string s = *it;
+		  Pattern p = patterns[s];
+		  cout << p.GUID << endl;
+		}
+		continue;
       }
       
       if(tokens[0] == "scanarray"){
-	string charArray = tokens[0];
-	string binArray = string_to_hex(charArray);
-	
-	vector<string> results = ahocorasick.query(binArray);
-	
-	for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
-	  string s = *it;
-	  Pattern p = patterns[s];
-	  cout << p.GUID << endl;
-	}
-	continue;
-      }
+		string charArray = tokens[1]; 
+		//cout <<tokens[1] <<endl;
+		string binArray = hex_to_string(charArray);
+		//cout << string_to_hex(binArray)<<endl;
+		vector<string> results = ahocorasick.query(binArray);
+		
+		for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
+		  string s = *it;
+		  Pattern p = patterns[s];
+		  cout << p.GUID << endl;
+		}
+		continue;
+	  }
       
       cout << "Unrecognized command."<<endl;
     }
