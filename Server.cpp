@@ -18,8 +18,14 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <iostream>
+#include "ACEPattern.h"
+#include "ACE.cpp"
 
 vector<string> keywords;
+    typedef unsigned char byte;
+    typedef unsigned int  uint;
+    typedef unsigned long ulong;
+    
 
 class Pattern {
 public:
@@ -28,7 +34,8 @@ public:
 	string 	GUID;
 };
 map<string, Pattern> patterns;
-AhoCorasick ahocorasick;
+//AhoCorasick ahocorasick;
+ACE *ace = new ACE();
 
 std::string char_to_hex(unsigned char input){
    static const char* const lut = "0123456789abcdef";
@@ -118,12 +125,18 @@ bool addPattern(string line){
 	string s = hex_to_string(p.HexString);
 	
 	patterns[s] = p;
-	keywords.push_back( s );
+	ACEPattern *aceP = new ACEPattern((byte*)s.c_str(), s.size(), true);
+	ace->AddPattern(aceP);
+	//keywords.push_back( s );
 
 	return true;
 }
 
 string loadPaternsFile(string patternFilePath){
+	if( ace != NULL )
+		delete ace;
+	ace = new ACE();
+	
     patterns.clear();
     keywords.clear();
     ifstream patternsFile;
@@ -151,7 +164,8 @@ string loadPaternsFile(string patternFilePath){
 	    return "Failed to open pattern file: "+patternFilePath;
     }
 
-    ahocorasick.initializeMachine(keywords);
+	ace->Compile();
+    //ahocorasick.initializeMachine(keywords);
     
     return result;
 }
@@ -210,16 +224,16 @@ int main(int argc, char **argv) {
 		void *filecontents;
 		string scanFileName = tokens[1];
 		
-		vector<string> results;
+
 		{
 			boost::interprocess::file_mapping m_file(scanFileName.c_str(), boost::interprocess::read_only);
 			boost::interprocess::mapped_region region(m_file, boost::interprocess::read_only); 
 			
-			results = ahocorasick.query((unsigned char*)region.
-			get_address(), region.get_size());
+			ace->Search((byte*)region.get_address(), region.get_size());
+			//results = ahocorasick.query((unsigned char*)region.get_address(), region.get_size());
 		}
 		
-		for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
+		for(std::vector<string>::iterator it = ace->results.begin(); it != ace->results.end(); ++it) {
 		  string s = *it;
 		  Pattern p = patterns[s];
 		  cout << p.GUID << endl;
@@ -232,9 +246,13 @@ int main(int argc, char **argv) {
 		//cout <<tokens[1] <<endl;
 		string binArray = hex_to_string(charArray);
 		//cout << string_to_hex(binArray)<<endl;
-		vector<string> results = ahocorasick.query(binArray);
 		
-		for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
+		ace->Search((byte*)binArray.c_str(), binArray.size());
+		
+		//vector<string> results = ahocorasick.query(binArray);
+		
+		
+		for(std::vector<string>::iterator it = ace->results.begin(); it != ace->results.end(); ++it) {
 		  string s = *it;
 		  Pattern p = patterns[s];
 		  cout << p.GUID << endl;
@@ -258,7 +276,7 @@ int main(int argc, char **argv) {
     
     
     //vector<string> results = ahocorasick.query((unsigned char*)filecontents, filesize);
-    vector<string> results = ahocorasick.query(text);
+    //vector<string> results = ahocorasick.query(text);
     //vector<string> results = ahocorasick.query(whole_file);
     //vector<string> results = ahocorasick.query(x);
     
