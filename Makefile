@@ -1,7 +1,7 @@
 CC=clang++
 CXX=clang++
 CFLAGS=`pkg-config gtkmm-3.0 --cflags --libs` -ggdb
-LDFLAGS=-lboost_system -lboost_thread-mt
+LDFLAGS=-lboost_system-mt -lboost_thread-mt -lboost_filesystem-mt
 
 all: Server ScannerGUI
 

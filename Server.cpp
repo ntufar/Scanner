@@ -13,6 +13,11 @@
 #include <algorithm>
 #include <iterator>
 #include <boost/algorithm/string.hpp>
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <iostream>
 
 vector<string> keywords;
 
@@ -205,24 +210,14 @@ int main(int argc, char **argv) {
 	void *filecontents;
 	string scanFileName = tokens[1];
 	
-	struct stat st;
-	stat(scanFileName.c_str(), &st);
-	size_t filesize = st.st_size;
-
-	int fd = open(scanFileName.c_str(), O_RDONLY);
-	if( fd == -1 ){
-	  perror("Failed to open file ");
-	  continue;
+	vector<string> results;
+	{
+		boost::interprocess::file_mapping m_file(scanFileName.c_str(), boost::interprocess::read_only);
+		boost::interprocess::mapped_region region(m_file, boost::interprocess::read_only); 
+		
+		results = ahocorasick.query((unsigned char*)region.
+		get_address(), region.get_size());
 	}
-
-	filecontents = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, 0);
-	if(filecontents == (void *) -1) {
-	  cout << "Failed to map file " << scanFileName;
-	}
-	
-	vector<string> results = ahocorasick.query((unsigned char*)filecontents, filesize);
-	munmap(filecontents, filesize);
-	close(fd);
 	
 	for(std::vector<string>::iterator it = results.begin(); it != results.end(); ++it) {
 	  string s = *it;
