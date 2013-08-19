@@ -14,6 +14,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
+
 #ifdef POSIX
 #include <termios.h>
 #endif
@@ -32,6 +33,9 @@ public:
 		connect_start(endpoint_iterator);
 	}
 	
+	~telnet_client(){
+	}
+	
 	void write(const char msg) // pass the write data to the do_write function via the io service in the other thread
 	{
 		io_service_.post(boost::bind(&telnet_client::do_write, this, msg));
@@ -42,10 +46,23 @@ public:
 		io_service_.post(boost::bind(&telnet_client::do_close, this));
 	}
 	
+public:	
+	bool is_read_que_empty(void){
+		return readque.empty();
+	};
+	
+	char read_char_from_que(void){
+		char c;
+		c = readque.front();
+		readque.pop_front();
+		return c;
+	};
+	
 	deque<char> readque;
-
+	boost::mutex mtx_;
 private:
-
+	
+	
 	void connect_start(tcp::resolver::iterator endpoint_iterator)
 	{ // asynchronously connect a socket to the specified remote endpoint and call connect_complete when it completes or fails
 		tcp::endpoint endpoint = *endpoint_iterator;
@@ -81,9 +98,11 @@ private:
 		if (!error)
 		{ // read completed, so process the data
 			//cerr << "\nR: ";
+			mtx_.lock();
 			for(int i = 0; i < bytes_transferred; i++){
 				readque.push_back(read_msg_[i]);
 			}
+			mtx_.unlock();
 			read_start(); // start waiting for another asynchronous read again
 		}
 		else

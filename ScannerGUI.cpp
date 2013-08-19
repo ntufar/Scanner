@@ -2,6 +2,7 @@
 #include <iostream>
 #include <deque>
 #include <iostream>
+#include <glibmm/threads.h>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
@@ -24,6 +25,7 @@ public:
 protected:
   //Signal handlers:
   void on_button_clicked();
+  Glib::ustring x;
 
   //Member widgets:
   Gtk::Box m_box1;
@@ -35,6 +37,11 @@ protected:
   
   Gtk::Button m_button2;
   Gtk::ProgressBar m_progress;
+  
+
+private:
+  Glib::Threads::Mutex mutex;
+  bool stop;
 };
 
 void ScannerGUI::serverCommunicationThread() 
@@ -54,6 +61,10 @@ void ScannerGUI::serverCommunicationThread()
 			// resolve the host name and port number to an iterator that can be used to connect to the server
 			tcp::resolver resolver(io_service);
 			
+			{
+				Glib::Threads::Mutex::Lock lock (mutex); 
+				m_refTextBuffer1->insert_at_cursor("Connecting to localhost port 65001...\n");
+			}
 			tcp::resolver::query query("localhost", "65001");
 			tcp::resolver::iterator iterator = resolver.resolve(query);
 			// define an instance of the main class of this program
@@ -62,27 +73,29 @@ void ScannerGUI::serverCommunicationThread()
 			boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));	
 			while (1)
 			{
-				string ch;
+				string str;
+				c.mtx_.lock();
 				while(!c.readque.empty()){
-					ch += c.readque.front();
+					str += c.readque.front();
 					c.readque.pop_front();
 				}
-				cerr << ch;
-				m_refTextBuffer1->insert_at_cursor(ch);
+				c.mtx_.unlock();
+				{
+					Glib::Threads::Mutex::Lock lock (mutex); 
+					m_refTextBuffer1->insert_at_cursor(str);
+				}
+				
 				Glib::usleep(1000);
-				/*
-				cerr << "DaTa AvAiLaBle"<<endl;
-//				c.telnetin.getline(&ch,1024);
-				cout << ch;
-				cerr << ch;
-				m_refTextBuffer1->insert_at_cursor(ch);
-				* */
-				/*
-				cin.get(ch); // blocking wait for standard input
-				if (ch == 3) // ctrl-C to end program
-					break;
-				c.write(ch);
-				*/
+				str = "";
+				{
+					Glib::Threads::Mutex::Lock lock (mutex);
+        			if(stop == true){
+						c.close();
+						t.join();
+						return;
+					}
+				}
+
 			}
 			c.close(); // close the telnet client connection
 			t.join(); // wait for the IO service thread to close			
@@ -92,21 +105,6 @@ void ScannerGUI::serverCommunicationThread()
 		#ifdef POSIX // restore default buffering of standard input
 			tcsetattr(0, TCSANOW, &stored_settings);
 		#endif		
-		/*
-  while(1) 
-  { 
-    Glib::usleep(50000);  // 50.000 Mikrosekunden warten 
-    
-    m_dispatcher();       // Threadsafer Aufruf der pulse()-Methode 
-  
-    // Dies ist ein anonymer scope [Erklärung siehe Destruktor Defintion] 
-    { 
-      Glib::Mutex::Lock lock(mutex); 
-      if(m_end_thread)      // Müssen wir beenden? 
-        return; 
-    }// Ende des anonymen scopes, das den effekt hat das das mutex wir unlocked wird 
-  }
-  * */ 
 }
 
 
@@ -123,8 +121,10 @@ int main (int argc, char *argv[])
 ScannerGUI::ScannerGUI():
  	m_button1("Select folder to scan"),   // creates a new button with label "Hello World".
 	m_button2("hello"),
-	m_box1(Gtk::ORIENTATION_VERTICAL)
+	m_box1(Gtk::ORIENTATION_VERTICAL),
+	stop(false)
 {
+	//if(!Glib::thread_supported()) Glib::thread_init();
   // Sets the border width of the window.
   set_border_width(20);
   set_title("Scanner (c) Nicolai Tufar, 2013");
@@ -164,13 +164,19 @@ ScannerGUI::ScannerGUI():
 
   m_progress.show();
 
-	m_thread = Glib::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread),false); 
+	m_thread = Glib::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread),true); 
 
   m_box1.show();
 }
 
 ScannerGUI::~ScannerGUI()
 {
+	{
+		Glib::Threads::Mutex::Lock lock (mutex);
+		stop = true;
+	}
+	if(m_thread)
+		m_thread->join();
 }
 
 void ScannerGUI::on_button_clicked()
@@ -188,8 +194,7 @@ void ScannerGUI::on_button_clicked()
   {
     case(Gtk::RESPONSE_OK):
     {
-      std::cout << "Scanning: " << dialog.get_filename()
-          << std::endl;
+      std::cout << "Scanning: " << dialog.get_filename() << std::endl;
       break;
     }
     case(Gtk::RESPONSE_CANCEL):
