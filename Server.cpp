@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
     
     std::string userInput;
     
-    while(1){
+    while(std::cin){
       cout << "OVER" << endl;
       
       getline (cin, userInput);
@@ -233,12 +233,14 @@ int main(int argc, char **argv) {
 		string scanFileName = tokens[1];
 		
 
-		{
+		try{
 			boost::interprocess::file_mapping m_file(scanFileName.c_str(), boost::interprocess::read_only);
 			boost::interprocess::mapped_region region(m_file, boost::interprocess::read_only); 
 			
 			ace->Search((byte*)region.get_address(), region.get_size());
 			//results = ahocorasick.query((unsigned char*)region.get_address(), region.get_size());
+		}catch(boost::interprocess::interprocess_exception &e){
+			cout << e.what()<<endl;
 		}
 		
 		for(std::vector<string>::iterator it = ace->results.begin(); it != ace->results.end(); ++it) {
@@ -271,24 +273,8 @@ int main(int argc, char **argv) {
       cout << "Unrecognized command."<<endl;
     }
     
+    cout << "Godbye" <<endl;
     exit(0);
-    
-    
-    string text = keywords[9];
-    
-    
-   
-    text = "hello wworld this will be a viruu"+text+"hello world again";
-    
-    cout << "text:          " << string_to_hex(text) << endl;
-    
-    
-    //vector<string> results = ahocorasick.query((unsigned char*)filecontents, filesize);
-    //vector<string> results = ahocorasick.query(text);
-    //vector<string> results = ahocorasick.query(whole_file);
-    //vector<string> results = ahocorasick.query(x);
-    
-    
     
     return 0;
 }
