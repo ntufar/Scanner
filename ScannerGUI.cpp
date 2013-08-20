@@ -17,19 +17,48 @@
 using boost::asio::ip::tcp;
 using namespace std;
 
+
+class ScannerGUI;//forward declaration
+class Worker{
+	private:
+	ScannerGUI* mainThread;
+	Glib::Threads::Mutex mutex;
+	deque<string> tx;
+	deque<string> rx;
+	void _processFiles();
+	void addTextToTextArea(string text);
+	void showProgress(string text, double progress);
+	
+	public:
+	Worker(ScannerGUI* mainThread);
+	void serverCommunicationThread();
+	Glib::Dispatcher updateTextArea;
+	Glib::Dispatcher updateProgress;
+	string textAreaMessage;
+	string progressMessage;
+	double progressFraction;
+	void processFiles();
+	string folderToProcess;
+	bool stop;
+};
+
+
 class ScannerGUI : public Gtk::Window
 {
 
 public:
   ScannerGUI();
   virtual ~ScannerGUI();
-  void serverCommunicationThread();
-  void processFiles();
+  Glib::Threads::Mutex mainMutex;
+  void updateTextAreaMain();
+  void updateProgressMain(); 
+  Glib::Dispatcher doScan;
 
 protected:
   //Signal handlers:
   void on_button_clicked();
   Glib::ustring x;
+  Worker *worker;
 
   //Member widgets:
   Gtk::Box m_box1;
@@ -41,17 +70,45 @@ protected:
   
   Gtk::Button m_button2;
   Gtk::ProgressBar m_progress;
+  void addTextToTextArea(string text);
+  void updateProgress(string text, double progress);
+  Glib::Dispatcher sig_message;
+
   
 
 private:
-  Glib::Threads::Mutex mutex;
-  bool stop;
   string folderToProcess;
-  deque<string> tx;
-  deque<string> rx;
 };
 
-void ScannerGUI::processFiles(){
+void ScannerGUI::updateTextAreaMain(){
+	m_refTextBuffer1->begin_user_action();	
+	m_refTextBuffer1->insert_interactive_at_cursor(worker->textAreaMessage);
+	m_refTextBuffer1->end_user_action();	
+}
+
+void ScannerGUI::updateProgressMain(){
+	m_progress.set_text(worker->progressMessage);
+	m_progress.set_fraction(worker->progressFraction);
+}
+
+void Worker::addTextToTextArea(string text){
+	Glib::Threads::Mutex::Lock lock (mutex); 
+	this->textAreaMessage = text;
+	updateTextArea();	
+}
+
+void Worker::showProgress(string text, double progress){
+	Glib::Threads::Mutex::Lock lock (mutex); 
+	this->progressMessage = text;
+	this->progressFraction = progress;
+	updateProgress();
+}
+
+void Worker::processFiles(){
+  Glib::Threads::Thread::create( sigc::mem_fun(*this,&Worker::_processFiles)); 	
+}
+
+void Worker::_processFiles(){
       using namespace boost::filesystem;
       rx.clear();
       path current_dir(folderToProcess); //
@@ -65,21 +122,25 @@ void ScannerGUI::processFiles(){
 		  string s = filesToScan[i];
 		  double progress = i;
 		  progress /= filesToScan.size();
-		  m_progress.set_text(s);
-		  m_progress.set_fraction(progress);
-		  //std::cout << s << " : " << progress << endl;
-		  tx.push_back("scanfile "+s+"\n");
+		  showProgress(s, progress);
+		  tx.push_back("scanfile \""+s+"\"\n");
 		  while( rx.size() == 0 )
-			Glib::usleep(1000);
+			Glib::usleep(10000);
 		  string str = rx.front();
 		  rx.pop_front();
 		  //std::cout << "RX: "<< str << endl;
 			
 		}	  
-		m_progress.set_fraction(1);
+		showProgress("Done",1);
 }
 
-void ScannerGUI::serverCommunicationThread() 
+
+Worker::Worker(ScannerGUI* mainThread){
+	this->mainThread = mainThread;
+	this->stop = false;
+}
+
+void Worker::serverCommunicationThread() 
 { 
 		// on Unix POXIS based systems, turn off line buffering of input, so cin.get() returns after every keypress
 		// On other systems, you'll need to look for an equivalent
@@ -96,10 +157,7 @@ void ScannerGUI::serverCommunicationThread()
 			// resolve the host name and port number to an iterator that can be used to connect to the server
 			tcp::resolver resolver(io_service);
 			
-			{
-				Glib::Threads::Mutex::Lock lock (mutex); 
-				m_refTextBuffer1->insert_at_cursor("Connecting to localhost port 65001...\n");
-			}
+			addTextToTextArea("Connecting to localhost port 65001...\n");
 			tcp::resolver::query query("localhost", "65001");
 			tcp::resolver::iterator iterator = resolver.resolve(query);
 			// define an instance of the main class of this program
@@ -130,22 +188,19 @@ void ScannerGUI::serverCommunicationThread()
 				
 				// Update text buffer
 				if( dataRx ){
-					Glib::Threads::Mutex::Lock lock (mutex); 
-					m_refTextBuffer1->begin_user_action();	
-					m_refTextBuffer1->insert_interactive_at_cursor(str);
-					m_refTextBuffer1->end_user_action();	
+					addTextToTextArea(str);
 				}
 				
 
 				//Write to server
 				if( tx.size() != 0 ){
-					Glib::Threads::Mutex::Lock lock (mutex); 
-					str = tx.front();
-					tx.pop_front();
+					{
+						Glib::Threads::Mutex::Lock lock (mutex); 
+						str = tx.front();
+						tx.pop_front();
+					}
 					//cout << "tx: " << str << endl;
-					m_refTextBuffer1->begin_user_action();	
-					m_refTextBuffer1->insert_interactive_at_cursor(str);		
-					m_refTextBuffer1->end_user_action();	
+					addTextToTextArea(str);
 					c.mtx_.lock();			
 					for(size_t i = 0; i < str.length(); i++){
 						c.write(str[i]);
@@ -153,15 +208,15 @@ void ScannerGUI::serverCommunicationThread()
 					c.mtx_.unlock();
 				}
 				
-				Glib::usleep(1000);
+				Glib::usleep(10000);
 				str = "";
-				{
+				if(stop){
 					Glib::Threads::Mutex::Lock lock (mutex);
-        			if(stop == true){
+
 						c.close();
 						t.join();
 						return;
-					}
+
 				}
 
 			}
@@ -179,6 +234,7 @@ void ScannerGUI::serverCommunicationThread()
 int main (int argc, char *argv[])
 {
   Glib::RefPtr<Gtk::Application> app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+   if(!Glib::thread_supported()) Glib::thread_init();
 
   ScannerGUI scannerGui;
 
@@ -189,9 +245,8 @@ int main (int argc, char *argv[])
 ScannerGUI::ScannerGUI():
  	m_button1("Select folder to scan"),   // creates a new button with label "Hello World".
 	m_button2("hello"),
-	m_box1(Gtk::ORIENTATION_VERTICAL),
-	stop(false)
-{
+	m_box1(Gtk::ORIENTATION_VERTICAL)
+  {
 	//if(!Glib::thread_supported()) Glib::thread_init();
   // Sets the border width of the window.
   set_border_width(20);
@@ -231,17 +286,23 @@ ScannerGUI::ScannerGUI():
   //m_progress.set_fraction(0.33);
 
   m_progress.show();
-
-	m_thread = Glib::Threads::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread)); 
-
   m_box1.show();
+
+  worker = new Worker(this);
+  worker->updateTextArea.connect(sigc::mem_fun(*this, &ScannerGUI::updateTextAreaMain));
+  worker->updateProgress.connect(sigc::mem_fun(*this, &ScannerGUI::updateProgressMain));
+  this->doScan.connect(sigc::mem_fun(*worker, &Worker::processFiles));
+
+  m_thread = Glib::Threads::Thread::create( sigc::mem_fun(*worker,&Worker::serverCommunicationThread)); 
+
+
 }
 
 ScannerGUI::~ScannerGUI()
 {
 	{
-		Glib::Threads::Mutex::Lock lock (mutex);
-		stop = true;
+		Glib::Threads::Mutex::Lock lock (mainMutex);
+		worker->stop = true;
 	}
 	if(m_thread)
 		m_thread->join();
@@ -263,9 +324,10 @@ void ScannerGUI::on_button_clicked()
     case(Gtk::RESPONSE_OK):
     {
 	  dialog.hide();
-      std::cout << "Scanning: " << dialog.get_filename() << std::endl;
+      //std::cout << "Scanning: " << dialog.get_filename() << std::endl;
       folderToProcess = dialog.get_filename();
-      Glib::Threads::Thread::create( sigc::mem_fun(*this,&ScannerGUI::processFiles));
+      worker->folderToProcess = folderToProcess;
+      this->doScan();
       
       break;
     }
