@@ -6,6 +6,9 @@
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/lexical_cast.hpp>
 #include "telnet.h"
 #ifdef POSIX
 #include <termios.h>
@@ -21,6 +24,7 @@ public:
   ScannerGUI();
   virtual ~ScannerGUI();
   void serverCommunicationThread();
+  void processFiles();
 
 protected:
   //Signal handlers:
@@ -33,7 +37,7 @@ protected:
   Gtk::TextView m_TextView;  
   Gtk::ScrolledWindow m_ScrolledWindow;
   Glib::RefPtr<Gtk::TextBuffer> m_refTextBuffer1;
-  Glib::Thread * m_thread; 
+  Glib::Threads::Thread * m_thread; 
   
   Gtk::Button m_button2;
   Gtk::ProgressBar m_progress;
@@ -42,7 +46,32 @@ protected:
 private:
   Glib::Threads::Mutex mutex;
   bool stop;
+  string folderToProcess;
 };
+
+void ScannerGUI::processFiles(){
+      using namespace boost::filesystem;
+      path current_dir(folderToProcess); //
+	  //boost::regex pattern("a.*"); // list all files starting with a
+	  vector<string> filesToScan;
+	  for (recursive_directory_iterator iter(current_dir), end;	iter != end; ++iter){
+		std::string name = iter->path().leaf().c_str();
+		filesToScan.push_back(iter->path().c_str());
+		//std::cout << absolute(iter->path().leaf()) << endl;
+		//std::cout << iter->path() << "\n";
+	  }
+	  
+		for(size_t i = 0; i < filesToScan.size(); i++) {
+		  string s = filesToScan[i];
+		  double progress = i;
+		  progress /= filesToScan.size();
+		  m_progress.set_text(s);
+		  m_progress.set_fraction(progress);
+		  //std::cout << s << " : " << progress << endl;
+		  Glib::usleep(100000);
+		}	  
+		m_progress.set_fraction(1);
+}
 
 void ScannerGUI::serverCommunicationThread() 
 { 
@@ -158,13 +187,13 @@ ScannerGUI::ScannerGUI():
   //m_button2.show();
   m_box1.pack_start(m_progress, Gtk::PACK_SHRINK);
   //m_progress.set_default_size(570, 50);
-  m_progress.set_text("Scanning progress");
+  m_progress.set_text("");
   m_progress.set_show_text(true);
-  m_progress.set_fraction(0.33);
+  //m_progress.set_fraction(0.33);
 
   m_progress.show();
 
-	m_thread = Glib::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread),true); 
+	m_thread = Glib::Threads::Thread::create( sigc::mem_fun(*this,&ScannerGUI::serverCommunicationThread)); 
 
   m_box1.show();
 }
@@ -194,7 +223,11 @@ void ScannerGUI::on_button_clicked()
   {
     case(Gtk::RESPONSE_OK):
     {
+	  dialog.hide();
       std::cout << "Scanning: " << dialog.get_filename() << std::endl;
+      folderToProcess = dialog.get_filename();
+      Glib::Threads::Thread::create( sigc::mem_fun(*this,&ScannerGUI::processFiles));
+      
       break;
     }
     case(Gtk::RESPONSE_CANCEL):
@@ -204,7 +237,7 @@ void ScannerGUI::on_button_clicked()
     }
     default:
     {
-      std::cout << "Unexpected button clicked." << std::endl;
+      // Dialog closed
       break;
     }
   }

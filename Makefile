@@ -5,7 +5,7 @@ LDFLAGS=-lboost_system-mt -lboost_thread-mt -lboost_filesystem-mt `pkg-config gt
 
 all: Server ScannerGUI
 
-Server: AhoCorasick.o Server.o ACE.o
+Server: Server.o
 
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -14,4 +14,4 @@ ScannerGUI: ScannerGUI.cpp telnet.cpp
 	$(CXX) -o ScannerGUI ScannerGUI.cpp telnet.cpp $(CFLAGS) $(LDFLAGS)
 
 clean:
-	rm -f AhoCorasick.o Server.o Server ScannerGUI ACE.o
+	rm -f Server.o Server ScannerGUI ACE.o

@@ -1,6 +1,7 @@
 #include <iostream>
+#include <string>
+#include <map>
 #include <ostream>
-#include "AhoCorasick.h"
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -20,6 +21,7 @@
 #include <iostream>
 #include "ACEPattern.h"
 #include "ACE.cpp"
+using namespace std;
 
 vector<string> keywords;
     typedef unsigned char byte;
