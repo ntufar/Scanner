@@ -55,15 +55,11 @@ void ScannerGUI::processFiles(){
       using namespace boost::filesystem;
       rx.clear();
       path current_dir(folderToProcess); //
-	  //boost::regex pattern("a.*"); // list all files starting with a
 	  vector<string> filesToScan;
 	  for (recursive_directory_iterator iter(current_dir), end;	iter != end; ++iter){
-		//std::string name = iter->path().leaf().c_str();
 		if( boost::filesystem::is_regular_file( iter->path() ))
 			filesToScan.push_back(iter->path().c_str());
-		//std::cout << absolute(iter->path().leaf()) << endl;
-		//std::cout << iter->path() << "\n";
-	  }
+		}
 	  
 		for(size_t i = 0; i < filesToScan.size(); i++) {
 		  string s = filesToScan[i];
@@ -74,10 +70,10 @@ void ScannerGUI::processFiles(){
 		  //std::cout << s << " : " << progress << endl;
 		  tx.push_back("scanfile "+s+"\n");
 		  while( rx.size() == 0 )
-			Glib::usleep(10000);
+			Glib::usleep(1000);
 		  string str = rx.front();
 		  rx.pop_front();
-		  std::cout << "RX: "<< str << endl;
+		  //std::cout << "RX: "<< str << endl;
 			
 		}	  
 		m_progress.set_fraction(1);
@@ -129,7 +125,6 @@ void ScannerGUI::serverCommunicationThread()
 				// Write responce to our waiting thread
 				if( dataRx ){
 					Glib::Threads::Mutex::Lock lock (mutex); 
-					cout << counter << "c.readque.size()="<<c.readque.size()<< " Pushing to rx: "<<str<<endl;
 					rx.push_back(str);
 				}
 				
@@ -147,7 +142,7 @@ void ScannerGUI::serverCommunicationThread()
 					Glib::Threads::Mutex::Lock lock (mutex); 
 					str = tx.front();
 					tx.pop_front();
-					cout << "tx: " << str << endl;
+					//cout << "tx: " << str << endl;
 					m_refTextBuffer1->begin_user_action();	
 					m_refTextBuffer1->insert_interactive_at_cursor(str);		
 					m_refTextBuffer1->end_user_action();	
