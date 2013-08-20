@@ -192,7 +192,13 @@ std::vector<std::string> split(const std::string &s, char delim) {
 
 
 int main(int argc, char **argv) {
-    string patternsFilePath = "/home/ntufar/projects/Scanner/doc/patterns100";
+	string patternsFilePath;
+	if(argv[1]==NULL){
+		patternsFilePath = "/home/ntufar/projects/Scanner/doc/patterns100";
+	}else{
+		patternsFilePath = argv[1];
+	}
+    
     string loadPatternsResult = loadPaternsFile(patternsFilePath);
     cout << loadPatternsResult << endl;
     
