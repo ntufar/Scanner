@@ -47,16 +47,20 @@ private:
   Glib::Threads::Mutex mutex;
   bool stop;
   string folderToProcess;
+  deque<string> tx;
+  deque<string> rx;
 };
 
 void ScannerGUI::processFiles(){
       using namespace boost::filesystem;
+      rx.clear();
       path current_dir(folderToProcess); //
 	  //boost::regex pattern("a.*"); // list all files starting with a
 	  vector<string> filesToScan;
 	  for (recursive_directory_iterator iter(current_dir), end;	iter != end; ++iter){
-		std::string name = iter->path().leaf().c_str();
-		filesToScan.push_back(iter->path().c_str());
+		//std::string name = iter->path().leaf().c_str();
+		if( boost::filesystem::is_regular_file( iter->path() ))
+			filesToScan.push_back(iter->path().c_str());
 		//std::cout << absolute(iter->path().leaf()) << endl;
 		//std::cout << iter->path() << "\n";
 	  }
@@ -68,7 +72,13 @@ void ScannerGUI::processFiles(){
 		  m_progress.set_text(s);
 		  m_progress.set_fraction(progress);
 		  //std::cout << s << " : " << progress << endl;
-		  Glib::usleep(100000);
+		  tx.push_back("scanfile "+s+"\n");
+		  while( rx.size() == 0 )
+			Glib::usleep(10000);
+		  string str = rx.front();
+		  rx.pop_front();
+		  std::cout << "RX: "<< str << endl;
+			
 		}	  
 		m_progress.set_fraction(1);
 }
@@ -100,18 +110,52 @@ void ScannerGUI::serverCommunicationThread()
 			telnet_client c(io_service, iterator);
 			// run the IO service as a separate thread, so the main thread can block on standard input
 			boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));	
+			long counter = 0;
 			while (1)
 			{
 				string str;
+				counter++;
+				bool dataRx = false;
+				
+				// Read from server
 				c.mtx_.lock();
-				while(!c.readque.empty()){
+				while(c.readque.size() != 0){
 					str += c.readque.front();
 					c.readque.pop_front();
+					dataRx = true;
 				}
 				c.mtx_.unlock();
-				{
+				
+				// Write responce to our waiting thread
+				if( dataRx ){
 					Glib::Threads::Mutex::Lock lock (mutex); 
-					m_refTextBuffer1->insert_at_cursor(str);
+					cout << counter << "c.readque.size()="<<c.readque.size()<< " Pushing to rx: "<<str<<endl;
+					rx.push_back(str);
+				}
+				
+				// Update text buffer
+				if( dataRx ){
+					Glib::Threads::Mutex::Lock lock (mutex); 
+					m_refTextBuffer1->begin_user_action();	
+					m_refTextBuffer1->insert_interactive_at_cursor(str);
+					m_refTextBuffer1->end_user_action();	
+				}
+				
+
+				//Write to server
+				if( tx.size() != 0 ){
+					Glib::Threads::Mutex::Lock lock (mutex); 
+					str = tx.front();
+					tx.pop_front();
+					cout << "tx: " << str << endl;
+					m_refTextBuffer1->begin_user_action();	
+					m_refTextBuffer1->insert_interactive_at_cursor(str);		
+					m_refTextBuffer1->end_user_action();	
+					c.mtx_.lock();			
+					for(size_t i = 0; i < str.length(); i++){
+						c.write(str[i]);
+					}
+					c.mtx_.unlock();
 				}
 				
 				Glib::usleep(1000);
