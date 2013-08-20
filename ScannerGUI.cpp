@@ -81,12 +81,14 @@ private:
 };
 
 void ScannerGUI::updateTextAreaMain(){
+	Glib::Threads::Mutex::Lock lock (mainMutex); 
 	m_refTextBuffer1->begin_user_action();	
 	m_refTextBuffer1->insert_interactive_at_cursor(worker->textAreaMessage);
 	m_refTextBuffer1->end_user_action();	
 }
 
 void ScannerGUI::updateProgressMain(){
+	Glib::Threads::Mutex::Lock lock (mainMutex); 
 	m_progress.set_text(worker->progressMessage);
 	m_progress.set_fraction(worker->progressFraction);
 }
@@ -253,6 +255,7 @@ ScannerGUI::ScannerGUI():
   set_title("Scanner (c) Nicolai Tufar, 2013");
   set_position(Gtk::WindowPosition(Gtk::WIN_POS_CENTER));
   set_default_size(600, 400);
+  
   
   
   
