@@ -18,6 +18,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/tokenizer.hpp>
+#include <boost/foreach.hpp>
 #include <iostream>
 #include "ACEPattern.h"
 #include "ACE.cpp"
@@ -202,7 +204,11 @@ int main(int argc, char **argv) {
       
       getline (cin, userInput);
       vector<string> tokens;
-      boost::split(tokens, userInput, boost::is_any_of("\t \r\n"));
+      //boost::split(tokens, userInput, boost::is_any_of("\t \r\n"));
+      //boost::tokenizer<boost::escaped_list_separator<char> > t(userInput, boost::escaped_list_separator<char>("\\", ",", "\""));
+      boost::tokenizer<boost::escaped_list_separator<char> > t(userInput, boost::escaped_list_separator<char>("\\", " ", "\""));
+	  BOOST_FOREACH(string s, t)
+		tokens.push_back(s);
       
       if( tokens.size() < 1 )
 	continue;
